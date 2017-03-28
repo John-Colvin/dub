@@ -25,28 +25,29 @@ import std.utf;
 /* Add output range support to File
 */
 struct RangeFile {
+@safe:
 	std.stdio.File file;
 
-	void put(in ubyte[] bytes) { file.rawWrite(bytes); }
-	void put(in char[] str) { put(cast(ubyte[])str); }
-	void put(char ch) { put((&ch)[0 .. 1]); }
+	void put(in ubyte[] bytes) @trusted { file.rawWrite(bytes); }
+	void put(in char[] str) { put(cast(const(ubyte)[])str); }
+	void put(char ch) @trusted { put((&ch)[0 .. 1]); }
 	void put(dchar ch) { char[4] chars; put(chars[0 .. encode(chars, ch)]); }
 
 	ubyte[] readAll()
 	{
-		auto sz = file.size;
+		auto sz = this.size;
 		enforce(sz <= size_t.max, "File is too big to read to memory.");
-		file.seek(0, SEEK_SET);
+		() @trusted { file.seek(0, SEEK_SET); } ();
 		auto ret = new ubyte[cast(size_t)sz];
 		rawRead(ret);
 		return ret;
 	}
 
-	void rawRead(ubyte[] dst) { enforce(file.rawRead(dst).length == dst.length, "Failed to readall bytes from file."); }
+	void rawRead(ubyte[] dst) @trusted { enforce(file.rawRead(dst).length == dst.length, "Failed to readall bytes from file."); }
 	void write(string str) { put(str); }
-	void close() { file.close(); }
-	void flush() { file.flush(); }
-	@property ulong size() { return file.size; }
+	void close() @trusted { file.close(); }
+	void flush() @trusted { file.flush(); }
+	@property ulong size() @trusted { return file.size; }
 }
 
 
