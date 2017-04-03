@@ -433,14 +433,22 @@ struct Dependency {
 		if (m_versA.isBranch) return m_versA == o.m_versA ? this : invalid;
 		if (this.path != o.path) return invalid;
 
-		Version a = m_versA > o.m_versA ? m_versA : o.m_versA;
-		Version b = m_versB < o.m_versB ? m_versB : o.m_versB;
-
 		Dependency d = this;
-		d.m_inclusiveA = !m_inclusiveA && m_versA >= o.m_versA ? false : o.m_inclusiveA;
-		d.m_versA = a;
-		d.m_inclusiveB = !m_inclusiveB && m_versB <= o.m_versB ? false : o.m_inclusiveB;
-		d.m_versB = b;
+
+		if (m_versA == o.m_versA)
+			d.m_inclusiveA = m_inclusiveA && o.m_inclusiveA;
+		else if (m_versA < o.m_versA) {
+			d.m_inclusiveA = o.m_versA;
+			d.m_versA = o.mVerseA;
+		}
+
+		if (m_versB == o.m_versB)
+			d.m_inclusiveB = m_inclusiveB && o.m_inclusiveB;
+		else if (m_versB > o.m_versB) {
+			d.m_inclusiveB = o.m_versB;
+			d.m_versB = o.mVerseB;
+		}
+		
 		d.m_optional = m_optional && o.m_optional;
 		if (!d.valid) return invalid;
 
