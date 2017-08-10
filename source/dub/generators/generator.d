@@ -142,14 +142,13 @@ class ProjectGenerator
 	*/
 	protected void performPostGenerateActions(GeneratorSettings settings, in TargetInfo[string] targets) {}
 
-	private BuildSettings collect(GeneratorSettings settings, Package pack, BuildSettings parentSettings, ref TargetInfo[string] targets, in string[string] configs, ref string[] main_files, string bin_pack, BuildSettings[string] downSettingsMap = null)
+	private BuildSettings collect(GeneratorSettings settings, Package pack, BuildSettings parentSettings, ref TargetInfo[string] targets, in string[string] configs, ref string[] main_files, string bin_pack, BuildSettings[string] forDependentsSettingsMap = null)
 	{
-		import std.algorithm : sort, each;
-		import std.array : byPair;
+		import std.algorithm : sort;
 		import dub.compilers.utils : isLinkerFile;
 		import dub.internal.utils : stripDlangSpecialChars;
 
-		BuildSettings buildsettings, downBuildSettings;
+		BuildSettings buildsettings, forDependentsBuildSettings;
 		bool is_target;
 
 		void setIs_target(TargetType tt)
@@ -158,7 +157,7 @@ class ProjectGenerator
 			is_target = generates_binary || pack is m_project.rootPackage;
 		}
 
-		static auto mergeDown(BuildSettings parent, ref BuildSettings child) {
+		static auto mergeForDependents(BuildSettings parent, ref BuildSettings child) {
 			child.addVersions(parent.versions);
 			child.addDebugVersions(parent.debugVersions);
 			child.addOptions(BuildOptions(cast(BuildOptions)parent.options & inheritedBuildOptions));
@@ -227,27 +226,27 @@ class ProjectGenerator
 			if (is_target)
 				targets[pack.name] = TargetInfo(pack, [pack], configs[pack.name], buildsettings, null);
 
-			downBuildSettings = buildsettings.dup;
-			mergeDown(parentSettings, downBuildSettings);
+			forDependentsBuildSettings = buildsettings.dup;
+			mergeForDependents(parentSettings, forDependentsBuildSettings);
 		}
 		else {
 			buildsettings = packInTargets.buildSettings;
-			downBuildSettings = parentSettings;
+			forDependentsBuildSettings = parentSettings;
 			setIs_target(buildsettings.targetType);
 		}
 
 		if (is_target)
-			downSettingsMap[pack.name] = downBuildSettings.dup;
+			forDependentsSettingsMap[pack.name] = forDependentsBuildSettings.dup;
 
 		buildsettings.addVersions(["Have_" ~ stripDlangSpecialChars(pack.name)]);
 
 		auto deps = pack.getDependencies(configs[pack.name]);
-		foreach (depname; deps.keys.dup.sort()) {
+		foreach (depname; deps.keys.sort()) {
 			auto depspec = deps[depname];
 			auto dep = m_project.getDependency(depname, depspec.optional);
 			if (!dep) continue;
 
-			auto depbs = collect(settings, dep, downBuildSettings, targets, configs, main_files, is_target ? pack.name : bin_pack, downSettingsMap);
+			auto depbs = collect(settings, dep, forDependentsBuildSettings, targets, configs, main_files, is_target ? pack.name : bin_pack, forDependentsSettingsMap);
 
 			if (packInTargets is null) {
 				if (depbs.targetType != TargetType.sourceLibrary && depbs.targetType != TargetType.none) {
@@ -277,7 +276,8 @@ class ProjectGenerator
 			targets[pack.name].buildSettings = buildsettings;
 
 		if (pack is m_project.rootPackage)
-			downSettingsMap.byPair.each!(p => mergeDown(p[1], targets[p[0]].buildSettings));
+			foreach (targetName; forDependentsSettingsMap.byKey())
+				mergeForDependents(forDependentsSettingsMap[targetName], targets[targetName].buildSettings);
 
 		return ret;
 	}
