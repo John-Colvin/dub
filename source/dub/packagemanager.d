@@ -37,6 +37,12 @@ class PackageManager {
 		bool m_disableDefaultSearchPaths = false;
 	}
 
+	this(NativePath user_path, NativePath system_path, NativePath custom_path, bool refresh_packages = true)
+	{
+		m_repositories[LocalPackageType.custom] = Repository(custom_path);
+		this(user_path, system_path, refresh_packages);
+	}
+
 	this(NativePath user_path, NativePath system_path, bool refresh_packages = true)
 	{
 		m_repositories[LocalPackageType.user] = Repository(user_path);
@@ -71,10 +77,10 @@ class PackageManager {
 		auto ret = appender!(NativePath[])();
 		ret.put(cast(NativePath[])m_searchPath); // work around Phobos 17251
 		if (!m_disableDefaultSearchPaths) {
-			ret.put(cast(NativePath[])m_repositories[LocalPackageType.user].searchPath);
-			ret.put(cast(NativePath)m_repositories[LocalPackageType.user].packagePath);
-			ret.put(cast(NativePath[])m_repositories[LocalPackageType.system].searchPath);
-			ret.put(cast(NativePath)m_repositories[LocalPackageType.system].packagePath);
+			foreach (repo; m_repositories.values) {
+				ret.put(cast(NativePath[])repo.searchPath);
+				ret.put(cast(NativePath)repo.packagePath);
+			}
 		}
 		return ret.data;
 	}
@@ -100,8 +106,8 @@ class PackageManager {
 	Package getPackage(string name, Version ver, bool enable_overrides = true)
 	{
 		if (enable_overrides) {
-			foreach (tp; [LocalPackageType.user, LocalPackageType.system])
-				foreach (ovr; m_repositories[tp].overrides)
+			foreach (repo; m_repositories.values)
+				foreach (ovr; repo.overrides)
 					if (ovr.package_ == name && ovr.version_.matches(ver)) {
 						Package pack;
 						if (!ovr.targetPath.empty) pack = getOrLoadPackage(ovr.targetPath);
@@ -246,8 +252,8 @@ class PackageManager {
 	*/
 	bool isManagedPath(NativePath path)
 	const {
-		foreach (rep; m_repositories) {
-			NativePath rpath = rep.packagePath;
+		foreach (repo; m_repositories.values) {
+			NativePath rpath = repo.packagePath;
 			if (path.startsWith(rpath))
 				return true;
 		}
@@ -266,8 +272,8 @@ class PackageManager {
 				if (auto ret = del(tp)) return ret;
 
 			// first search local packages
-			foreach (tp; LocalPackageType.min .. LocalPackageType.max+1)
-				foreach (p; m_repositories[cast(LocalPackageType)tp].localPackages)
+			foreach (repo; m_repositories.values)
+				foreach (p; repo.localPackages)
 					if (auto ret = del(p)) return ret;
 
 			// and then all packages gathered from the search path
@@ -447,7 +453,7 @@ class PackageManager {
 			}
 			return false;
 		}
-		foreach(repo; m_repositories) {
+		foreach(ref repo; m_repositories) {
 			if(removeFrom(repo.localPackages, pack)) {
 				found = true;
 				break;
@@ -536,9 +542,9 @@ class PackageManager {
 		logDiagnostic("Refreshing local packages (refresh existing: %s)...", refresh_existing_packages);
 
 		// load locally defined packages
-		void scanLocalPackages(LocalPackageType type)
+		void scanLocalPackages(ref Repository repo)
 		{
-			NativePath list_path = m_repositories[type].packagePath;
+			NativePath list_path = repo.packagePath;
 			Package[] packs;
 			NativePath[] paths;
 			if (!m_disableDefaultSearchPaths) try {
@@ -559,7 +565,7 @@ class PackageManager {
 
 							Package pp;
 							if (!refresh_existing_packages) {
-								foreach (p; m_repositories[type].localPackages)
+								foreach (p; repo.localPackages)
 									if (p.path == path) {
 										pp = p;
 										break;
@@ -591,11 +597,12 @@ class PackageManager {
 			} catch( Exception e ){
 				logDiagnostic("Loading of local package list at %s failed: %s", list_path.toNativeString(), e.msg);
 			}
-			m_repositories[type].localPackages = packs;
-			m_repositories[type].searchPath = paths;
+			repo.localPackages = packs;
+			repo.searchPath = paths;
 		}
-		scanLocalPackages(LocalPackageType.system);
-		scanLocalPackages(LocalPackageType.user);
+
+		foreach (ref repo; m_repositories.values)
+			scanLocalPackages(repo);
 
 		auto old_packages = m_packages;
 
@@ -647,10 +654,10 @@ class PackageManager {
 		foreach (p; this.completeSearchPath)
 			scanPackageFolder(p);
 
-		void loadOverrides(LocalPackageType type)
+		void loadOverrides(ref Repository repo)
 		{
-			m_repositories[type].overrides = null;
-			auto ovrfilepath = m_repositories[type].packagePath ~ LocalOverridesFilename;
+			repo.overrides = null;
+			auto ovrfilepath = repo.packagePath ~ LocalOverridesFilename;
 			if (existsFile(ovrfilepath)) {
 				foreach (entry; jsonFromFile(ovrfilepath)) {
 					PackageOverride ovr;
@@ -658,12 +665,13 @@ class PackageManager {
 					ovr.version_ = Dependency(entry["version"].get!string);
 					if (auto pv = "targetVersion" in entry) ovr.targetVersion = Version(pv.get!string);
 					if (auto pv = "targetPath" in entry) ovr.targetPath = NativePath(pv.get!string);
-					m_repositories[type].overrides ~= ovr;
+					repo.overrides ~= ovr;
 				}
 			}
 		}
-		loadOverrides(LocalPackageType.user);
-		loadOverrides(LocalPackageType.system);
+
+		foreach (ref repo; m_repositories.values)
+			loadOverrides(repo);
 	}
 
 	alias Hash = ubyte[];
@@ -795,7 +803,8 @@ struct PackageOverride {
 
 enum LocalPackageType {
 	user,
-	system
+	system,
+	custom
 }
 
 private enum LocalPackagesFilename = "local-packages.json";

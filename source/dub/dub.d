@@ -132,10 +132,12 @@ class Dub {
 				suppliers, as well as the default suppliers.
 	*/
 	this(string root_path = ".", PackageSupplier[] additional_package_suppliers = null,
-			SkipPackageSuppliers skip_registry = SkipPackageSuppliers.none)
+			SkipPackageSuppliers skip_registry = SkipPackageSuppliers.none,
+			string customPackagePath = null)
 	{
 		m_rootPath = NativePath(root_path);
 		if (!m_rootPath.absolute) m_rootPath = NativePath(getcwd()) ~ m_rootPath;
+
 
 		init();
 
@@ -159,8 +161,13 @@ class Dub {
 		if (skip_registry < SkipPackageSuppliers.standard)
 			ps ~= defaultPackageSuppliers();
 
+		auto customPackagePathNative = NativePath(customPackagePath);
+		if (!customPackagePathNative.absolute)
+			customPackagePathNative = NativePath(getcwd()) ~ customPackagePathNative;
+
 		m_packageSuppliers = ps;
-		m_packageManager = new PackageManager(m_dirs.localRepository, m_dirs.systemSettings);
+		m_packageManager = new PackageManager(m_dirs.localRepository, m_dirs.systemSettings,
+				customPackagePathNative);
 		updatePackageSearchPath();
 	}
 
@@ -224,12 +231,12 @@ class Dub {
 		m_defaultArchitecture = m_config.defaultArchitecture;
 	}
 
-	version(Windows) 
+	version(Windows)
 	private void migrateRepositoryFromRoaming(NativePath roamingDir, NativePath localDir)
 	{
         immutable roamingDirPath = roamingDir.toNativeString();
 	    if (!existsDirectory(roamingDir)) return;
-        
+
         immutable localDirPath = localDir.toNativeString();
         logInfo("Detected a package cache in " ~ roamingDirPath ~ ". This will be migrated to " ~ localDirPath ~ ". Please wait...");
         if (!existsDirectory(localDir))
@@ -237,7 +244,7 @@ class Dub {
             mkdirRecurse(localDirPath);
         }
 
-        runCommand("xcopy /s /e /y " ~ roamingDirPath ~ " " ~ localDirPath ~ " > NUL"); 
+        runCommand("xcopy /s /e /y " ~ roamingDirPath ~ " " ~ localDirPath ~ " > NUL");
         rmdirRecurse(roamingDirPath);
 	}
 
@@ -940,10 +947,15 @@ class Dub {
 
 		See_Also: `removeLocalPackage`
 	*/
-	void addLocalPackage(string path, string ver, bool system)
+	deprecated void addLocalPackage(string path, string ver, bool system)
+	{
+		addLocalPackage(path, ver, system ? LocalPackageType.system : LocalPackageType.user);
+	}
+
+	void addLocalPackage(string path, string ver, LocalPackageType loc)
 	{
 		if (m_dryRun) return;
-		m_packageManager.addLocalPackage(makeAbsolute(path), ver, system ? LocalPackageType.system : LocalPackageType.user);
+		m_packageManager.addLocalPackage(makeAbsolute(path), ver, loc);
 	}
 
 	/** Removes a directory from the list of locally known packages.
@@ -957,10 +969,15 @@ class Dub {
 
 		See_Also: `addLocalPackage`
 	*/
-	void removeLocalPackage(string path, bool system)
+	deprecated void removeLocalPackage(string path, bool system)
+	{
+		removeLocalPackage(path, system ? LocalPackageType.system : LocalPackageType.user);
+	}
+
+	void removeLocalPackage(string path, LocalPackageType loc)
 	{
 		if (m_dryRun) return;
-		m_packageManager.removeLocalPackage(makeAbsolute(path), system ? LocalPackageType.system : LocalPackageType.user);
+		m_packageManager.removeLocalPackage(makeAbsolute(path), loc);
 	}
 
 	/** Registers a local directory to search for packages to use for satisfying
@@ -973,10 +990,15 @@ class Dub {
 
 		See_Also: `removeSearchPath`
 	*/
-	void addSearchPath(string path, bool system)
+	deprecated void addSearchPath(string path, bool system)
+	{
+		addSearchPath(path, system ? LocalPackageType.system : LocalPackageType.user);
+	}
+
+	void addSearchPath(string path, LocalPackageType loc)
 	{
 		if (m_dryRun) return;
-		m_packageManager.addSearchPath(makeAbsolute(path), system ? LocalPackageType.system : LocalPackageType.user);
+		m_packageManager.addSearchPath(makeAbsolute(path), loc);
 	}
 
 	/** Unregisters a local directory search path.
@@ -988,10 +1010,15 @@ class Dub {
 
 		See_Also: `addSearchPath`
 	*/
-	void removeSearchPath(string path, bool system)
+	deprecated void removeSearchPath(string path, bool system)
+	{
+		removeSearchPath(path, system ? LocalPackageType.system : LocalPackageType.user);
+	}
+
+	void removeSearchPath(string path, LocalPackageType loc)
 	{
 		if (m_dryRun) return;
-		m_packageManager.removeSearchPath(makeAbsolute(path), system ? LocalPackageType.system : LocalPackageType.user);
+		m_packageManager.removeSearchPath(makeAbsolute(path), loc);
 	}
 
 	/** Queries all package suppliers with the given query string.

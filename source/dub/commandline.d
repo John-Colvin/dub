@@ -225,7 +225,7 @@ int runDubCommandLine(string[] args)
 		} else {
 			// initialize DUB
 			auto package_suppliers = options.registry_urls.map!(url => cast(PackageSupplier)new RegistryPackageSupplier(URL(url))).array;
-			dub = new Dub(options.root_path, package_suppliers, options.skipRegistry);
+			dub = new Dub(options.root_path, package_suppliers, options.skipRegistry, options.customPackagePath);
 			dub.dryRun = options.annotate;
 			dub.defaultPlacementLocation = options.placementLocation;
 
@@ -261,6 +261,7 @@ struct CommonOptions {
 	string root_path;
 	SkipPackageSuppliers skipRegistry = SkipPackageSuppliers.none;
 	PlacementLocation placementLocation = PlacementLocation.user;
+	string customPackagePath;
 
 	/// Parses all common options and stores the result in the struct instance.
 	void prepare(CommandArgs args)
@@ -274,6 +275,9 @@ struct CommonOptions {
 			"  standard: Don't search the main registry (e.g. "~defaultRegistryURL~")",
 			"  configured: Skip all default and user configured registries",
 			"  all: Only search registries specified with --registry",
+			]);
+		args.getopt("custom-package-settings-path", &customPackagePath, [
+			"Path for custom package settings (i.e. local-packages.json and local-overrides.json)"
 			]);
 		args.getopt("annotate", &annotate, ["Do not perform any action, just print what would be done"]);
 		args.getopt("bare", &bare, ["Read only packages contained in the current directory"]);
@@ -1325,6 +1329,23 @@ class UninstallCommand : RemoveCommand {
 	}
 }
 
+LocalPackageType getLocSettings(scope CommandArgs args)
+{
+	bool m_system;
+	LocalPackageType loc = LocalPackageType.user;
+
+	args.getopt("system", &m_system, [
+		"Deprecated: Register system-wide instead of user-wide"
+	]);
+	if (m_system)
+		loc = LocalPackageType.system;
+	args.getopt("registration-scope", &loc, [
+		"Set where to register. Options are \"system\", \"user\" and \"custom\".",
+		"If \"custom\" is chosen, then \"--customPackagePath\" must be set.",
+		"Overrides \"--system\"."
+	]);
+	return loc;
+}
 
 /******************************************************************************/
 /* ADD/REMOVE PATH/LOCAL                                                      */
@@ -1332,14 +1353,12 @@ class UninstallCommand : RemoveCommand {
 
 abstract class RegistrationCommand : Command {
 	private {
-		bool m_system;
+		LocalPackageType loc = LocalPackageType.user;
 	}
 
 	override void prepare(scope CommandArgs args)
 	{
-		args.getopt("system", &m_system, [
-			"Register system-wide instead of user-wide"
-		]);
+		loc = getLocSettings(args);
 	}
 
 	abstract override int execute(Dub dub, string[] free_args, string[] app_args);
@@ -1366,7 +1385,7 @@ class AddPathCommand : RegistrationCommand {
 	override int execute(Dub dub, string[] free_args, string[] app_args)
 	{
 		enforceUsage(free_args.length == 1, "Missing search path.");
-		dub.addSearchPath(free_args[0], m_system);
+		dub.addSearchPath(free_args[0], loc);
 		return 0;
 	}
 }
@@ -1383,7 +1402,7 @@ class RemovePathCommand : RegistrationCommand {
 	override int execute(Dub dub, string[] free_args, string[] app_args)
 	{
 		enforceUsage(free_args.length == 1, "Expected one argument.");
-		dub.removeSearchPath(free_args[0], m_system);
+		dub.removeSearchPath(free_args[0], loc);
 		return 0;
 	}
 }
@@ -1407,7 +1426,7 @@ class AddLocalCommand : RegistrationCommand {
 	{
 		enforceUsage(free_args.length == 1 || free_args.length == 2, "Expecting one or two arguments.");
 		string ver = free_args.length == 2 ? free_args[1] : null;
-		dub.addLocalPackage(free_args[0], ver, m_system);
+		dub.addLocalPackage(free_args[0], ver, loc);
 		return 0;
 	}
 }
@@ -1425,7 +1444,7 @@ class RemoveLocalCommand : RegistrationCommand {
 	{
 		enforceUsage(free_args.length >= 1, "Missing package path argument.");
 		enforceUsage(free_args.length <= 1, "Expected the package path to be the only argument.");
-		dub.removeLocalPackage(free_args[0], m_system);
+		dub.removeLocalPackage(free_args[0], loc);
 		return 0;
 	}
 }
@@ -1506,7 +1525,7 @@ class SearchCommand : Command {
 
 class AddOverrideCommand : Command {
 	private {
-		bool m_system = false;
+		LocalPackageType loc = LocalPackageType.user;
 	}
 
 	this()
@@ -1520,26 +1539,23 @@ class AddOverrideCommand : Command {
 
 	override void prepare(scope CommandArgs args)
 	{
-		args.getopt("system", &m_system, [
-			"Register system-wide instead of user-wide"
-		]);
+		loc = getLocSettings(args);
 	}
 
 	override int execute(Dub dub, string[] free_args, string[] app_args)
 	{
 		enforceUsage(app_args.length == 0, "Unexpected application arguments.");
 		enforceUsage(free_args.length == 3, "Expected three arguments, not "~free_args.length.to!string);
-		auto scope_ = m_system ? LocalPackageType.system : LocalPackageType.user;
 		auto pack = free_args[0];
 		auto ver = Dependency(free_args[1]);
 		if (existsFile(NativePath(free_args[2]))) {
 			auto target = NativePath(free_args[2]);
 			if (!target.absolute) target = NativePath(getcwd()) ~ target;
-			dub.packageManager.addOverride(scope_, pack, ver, target);
+			dub.packageManager.addOverride(loc, pack, ver, target);
 			logInfo("Added override %s %s => %s", pack, ver, target);
 		} else {
 			auto target = Version(free_args[2]);
-			dub.packageManager.addOverride(scope_, pack, ver, target);
+			dub.packageManager.addOverride(loc, pack, ver, target);
 			logInfo("Added override %s %s => %s", pack, ver, target);
 		}
 		return 0;
@@ -1548,7 +1564,7 @@ class AddOverrideCommand : Command {
 
 class RemoveOverrideCommand : Command {
 	private {
-		bool m_system = false;
+		LocalPackageType loc = LocalPackageType.user;
 	}
 
 	this()
@@ -1562,17 +1578,14 @@ class RemoveOverrideCommand : Command {
 
 	override void prepare(scope CommandArgs args)
 	{
-		args.getopt("system", &m_system, [
-			"Register system-wide instead of user-wide"
-		]);
+		loc = getLocSettings(args);
 	}
 
 	override int execute(Dub dub, string[] free_args, string[] app_args)
 	{
 		enforceUsage(app_args.length == 0, "Unexpected application arguments.");
 		enforceUsage(free_args.length == 2, "Expected two arguments, not "~free_args.length.to!string);
-		auto scope_ = m_system ? LocalPackageType.system : LocalPackageType.user;
-		dub.packageManager.removeOverride(scope_, free_args[0], Dependency(free_args[1]));
+		dub.packageManager.removeOverride(loc, free_args[0], Dependency(free_args[1]));
 		return 0;
 	}
 }
@@ -1601,6 +1614,7 @@ class ListOverridesCommand : Command {
 		}
 		printList(dub.packageManager.getOverrides(LocalPackageType.user), "User wide overrides");
 		printList(dub.packageManager.getOverrides(LocalPackageType.system), "System wide overrides");
+		printList(dub.packageManager.getOverrides(LocalPackageType.custom), "Custom wide overrides");
 		return 0;
 	}
 }
