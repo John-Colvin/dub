@@ -20,6 +20,7 @@ import std.array : join, split;
 import std.exception : enforce;
 import std.file;
 import std.range;
+import std.typecons : Nullable;
 
 
 /**
@@ -159,6 +160,7 @@ struct BuildSettingsTemplate {
 	string[][string] postBuildCommands;
 	BuildRequirements[string] buildRequirements;
 	BuildOptions[string] buildOptions;
+	Nullable!bool dppSupport;
 
 
 	/// Constructs a BuildSettings object from this template.
@@ -205,7 +207,7 @@ struct BuildSettingsTemplate {
 		}
 
  		// collect source files
-		dst.addSourceFiles(collectFiles(sourcePaths, "*.d"));
+		dst.addSourceFiles(collectFiles(sourcePaths, "*.{d,dpp}"));
 		auto sourceFiles = dst.sourceFiles.sort();
 
  		// collect import files and remove sources

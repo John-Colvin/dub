@@ -1,0 +1,6 @@
+name "dpptest"
+description "A minimal D application."
+authors "John Colvin"
+copyright "Copyright © 2018, John Colvin"
+license "proprietary"
+dppSupport true

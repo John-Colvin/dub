@@ -1,3 +1,9 @@
+# WIP: adding support for dpp
+
+* support is only with .sdl files
+* add `dppSupport true` to your dub.sdl
+* `--compiler` needs to be given something it recognizes (e.g. `dmd-d++` will be recognised as `dmd`) but is actually `d++`. A symlink or one-line script wrapper will do.
+
 # dub package manager
 
 Package and build manager for [D](http://dlang.org/) applications and libraries.

@@ -43,6 +43,7 @@ struct BuildSettings {
 	string[] postBuildCommands;
 	@byName BuildRequirements requirements;
 	@byName BuildOptions options;
+	bool dppSupport;
 
 	BuildSettings dup()
 	const {
@@ -171,9 +172,9 @@ private:
 	static bool pathMatch(string path, string pattern)
 	{
 		import std.functional : memoize;
-		
+
 		alias nativePath = memoize!((string stringPath) => NativePath(stringPath));
-			
+
 		return nativePath(path) == nativePath(pattern) || globMatch(path, pattern);
 	}
 

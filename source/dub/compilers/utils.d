@@ -63,6 +63,7 @@ unittest {
 		assert(isLinkerFile("test.res"));
 		assert(!isLinkerFile("test.o"));
 		assert(!isLinkerFile("test.d"));
+		assert(!isLinkerFile("test.dpp"));
 	} else {
 		assert(isLinkerFile("test.o"));
 		assert(isLinkerFile("test.a"));
@@ -70,6 +71,7 @@ unittest {
 		assert(isLinkerFile("test.dylib"));
 		assert(!isLinkerFile("test.obj"));
 		assert(!isLinkerFile("test.d"));
+		assert(!isLinkerFile("test.dpp"));
 	}
 }
 

@@ -224,12 +224,12 @@ class Dub {
 		m_defaultArchitecture = m_config.defaultArchitecture;
 	}
 
-	version(Windows) 
+	version(Windows)
 	private void migrateRepositoryFromRoaming(NativePath roamingDir, NativePath localDir)
 	{
         immutable roamingDirPath = roamingDir.toNativeString();
 	    if (!existsDirectory(roamingDir)) return;
-        
+
         immutable localDirPath = localDir.toNativeString();
         logInfo("Detected a package cache in " ~ roamingDirPath ~ ". This will be migrated to " ~ localDirPath ~ ". Please wait...");
         if (!existsDirectory(localDir))
@@ -237,7 +237,7 @@ class Dub {
             mkdirRecurse(localDirPath);
         }
 
-        runCommand("xcopy /s /e /y " ~ roamingDirPath ~ " " ~ localDirPath ~ " > NUL"); 
+        runCommand("xcopy /s /e /y " ~ roamingDirPath ~ " " ~ localDirPath ~ " > NUL");
         rmdirRecurse(roamingDirPath);
 	}
 
@@ -603,21 +603,21 @@ class Dub {
 				import std.path;
 				tcinfo.sourceFiles[""] ~= custom_main_file.relativeTo(m_project.rootPackage.path).toNativeString();
 				tcinfo.importPaths[""] ~= custom_main_file.parentPath.toNativeString();
-				custommodname = custom_main_file.head.toString().baseName(".d");
+				custommodname = custom_main_file.head.toString().baseName().stripSourceSuffix(tcinfo.dppSupport);
 			}
 
 			// prepare the list of tested modules
 			string[] import_modules;
 			foreach (file; lbuildsettings.sourceFiles) {
-				if (file.endsWith(".d")) {
+				if (file.sourceFileType(tcinfo.dppSupport)) {
 					auto fname = NativePath(file).head.toString();
 					if (NativePath(file).relativeTo(m_project.rootPackage.path) == NativePath(mainfil)) {
 						logWarn("Excluding main source file %s from test.", mainfil);
 						tcinfo.excludedSourceFiles[""] ~= mainfil;
 						continue;
 					}
-					if (fname == "package.d") {
-						logWarn("Excluding package.d file from test due to https://issues.dlang.org/show_bug.cgi?id=11847");
+					if (fname == "package.d" || fname == "package.dpp") {
+						logWarn("Excluding " ~ fname ~ "file from test due to https://issues.dlang.org/show_bug.cgi?id=11847");
 						continue;
 					}
 					import_modules ~= dub.internal.utils.determineModuleName(lbuildsettings, NativePath(file), m_project.rootPackage.path);

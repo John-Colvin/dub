@@ -647,13 +647,13 @@ class Package {
 		auto pkg_name = m_info.name.length ? m_info.name : "unknown";
 		foreach(sf; bs.sourcePaths.get("", null)){
 			auto p = m_path ~ sf;
-			if( !existsFile(p) ) continue;
-			foreach(fil; ["app.d", "main.d", pkg_name ~ "/main.d", pkg_name ~ "/" ~ "app.d"]){
-				if( existsFile(p ~ fil) ) {
-					app_main_file = (NativePath(sf) ~ fil).toNativeString();
-					break;
-				}
-			}
+			if(!existsFile(p)) continue;
+			foreach(fil; ["app", "main", pkg_name ~ "/main", pkg_name ~ "/" ~ "app"])
+				foreach (suffix; [".d", ".dpp"])
+					if(existsFile(p ~ fil ~ suffix)) {
+						app_main_file = (NativePath(sf) ~ fil).toNativeString();
+						break;
+					}
 		}
 
 		// generate default configurations if none are defined

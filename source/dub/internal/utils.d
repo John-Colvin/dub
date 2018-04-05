@@ -496,10 +496,10 @@ string determineModuleName(BuildSettings settings, NativePath file, NativePath b
 	foreach (i; 0 .. mpath.length) {
 		import std.path;
 		auto p = mpath[i].toString();
-		if (p == "package.d") break;
+		if (p == "package.d" || p == "package.dpp") break;
 		if (i > 0) ret ~= ".";
 		if (i+1 < mpath.length) ret ~= p;
-		else ret ~= p.baseName(".d");
+		else ret ~= p.baseName().stripSourceSuffix(settings.dppSupport);
 	}
 
 	return ret.data;
@@ -561,3 +561,36 @@ string getModuleNameFromFile(string filePath) {
 	logDiagnostic("Get module name from path: " ~ filePath);
 	return getModuleNameFromContent(fileContent);
 }
+
+enum SourceFileType {
+	invalid,
+	d,
+	dpp
+}
+
+SourceFileType sourceFileType(string filePath, bool dppSupport) {
+	if (filePath.length >= 3) {
+		if (filePath[$ - 2 .. $] == ".d")
+			return SourceFileType.d;
+		else if (dppSupport &&
+				filePath.length >= 5 &&
+				filePath[$ - 5 .. $] == ".dpp")
+			return SourceFileType.dpp;
+	}
+	return SourceFileType.invalid;
+}
+
+string stripSourceSuffix(string filePath, bool dppSupport)
+{
+	final switch (filePath.sourceFileType(dppSupport)) with (SourceFileType) {
+		case d:
+			return filePath[0 .. $ - 2];
+		case dpp:
+			if (dppSupport)
+				return filePath[0 .. $ - 5];
+			goto case;
+		case invalid:
+			return filePath;
+	}
+}
+

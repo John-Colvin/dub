@@ -134,6 +134,7 @@ private void parseBuildSetting(Tag setting, ref BuildSettingsTemplate bs, string
 		case "targetType": bs.targetType = setting.stringTagValue.to!TargetType; break;
 		case "targetName": bs.targetName = setting.stringTagValue; break;
 		case "targetPath": bs.targetPath = setting.stringTagValue; break;
+		case "dppSupport": bs.dppSupport = setting.boolTagValue; break;
 		case "workingDirectory": bs.workingDirectory = setting.stringTagValue; break;
 		case "subConfiguration":
 			auto args = setting.stringArrayTagValue;
@@ -214,7 +215,8 @@ private Tag toSDL(in ref ConfigurationInfo config)
 private Tag[] toSDL(in ref BuildSettingsTemplate bs)
 {
 	Tag[] ret;
-	void add(string name, string value) { ret ~= new Tag(null, name, [Value(value)]); }
+	void add(T)(string name, T value) { ret ~= new Tag(null, name, [Value(value)]); }
+
 	void adda(string name, string suffix, in string[] values) {
 		ret ~= new Tag(null, name, values[].map!(v => Value(v)).array,
 			suffix.length ? [new Attribute(null, "platform", Value(suffix[1 .. $]))] : null);
@@ -241,6 +243,7 @@ private Tag[] toSDL(in ref BuildSettingsTemplate bs)
 	if (bs.targetName.length) add("targetName", bs.targetName);
 	if (bs.workingDirectory.length) add("workingDirectory", bs.workingDirectory);
 	if (bs.mainSourceFile.length) add("mainSourceFile", bs.mainSourceFile);
+	if (!bs.dppSupport.isNull) add("dppSupport", cast()bs.dppSupport.get());
 	foreach (pack, conf; bs.subConfigurations) ret ~= new Tag(null, "subConfiguration", [Value(pack), Value(conf)]);
 	foreach (suffix, arr; bs.dflags) adda("dflags", suffix, arr);
 	foreach (suffix, arr; bs.lflags) adda("lflags", suffix, arr);
@@ -282,6 +285,16 @@ private string stringTagValue(Tag t, bool allow_child_tags = false)
 	// Q: should attributes be disallowed, or just ignored for forward compatibility reasons?
 	//enforceSDL(t.attributes.length == 0, format("No attributes allowed for '%s'.", t.fullName), t);
 	return t.values[0].get!string;
+}
+
+private bool boolTagValue(Tag t)
+{
+	import std.format : format;
+	enforceSDL(t.values.length > 0, format("Missing boolean value for '%s'.", t.fullName), t);
+	enforceSDL(t.values.length == 1, format("Expected only one value for '%s'.", t.fullName), t);
+	enforceSDL(t.values[0].peek!bool !is null, format("Expected value of type boolean for '%s'.", t.fullName), t);
+	enforceSDL(t.tags.length == 0, format("No child tags allowed for '%s'.", t.fullName), t);
+	return t.values[0].get!bool;
 }
 
 private string[] stringArrayTagValue(Tag t, bool allow_child_tags = false)

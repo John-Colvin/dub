@@ -15,6 +15,7 @@ import dub.internal.vibecompat.core.file;
 import dub.internal.vibecompat.core.log;
 import dub.internal.vibecompat.data.json;
 import dub.internal.vibecompat.inet.url;
+import dub.internal.utils;
 import dub.package_;
 import dub.packagemanager;
 import dub.packagesupplier;
@@ -98,7 +99,7 @@ int runDubCommandLine(string[] args)
 	}
 
 	// special single-file package shebang syntax
-	if (args.length >= 2 && args[1].endsWith(".d")) {
+	if (args.length >= 2 && args[1].sourceFileType(true)) {
 		args = args[0] ~ ["run", "-q", "--temp-build", "--single", args[1], "--"] ~ args[2 ..$];
 	}
 
@@ -403,7 +404,8 @@ class Command {
 
 	private bool loadCwdPackage(Dub dub, bool warn_missing_package)
 	{
-		bool found = existsFile(dub.rootPath ~ "source/app.d");
+		bool found = existsFile(dub.rootPath ~ "source/app.d")
+			|| existsFile(dub.rootPath ~ "source/app.dpp");
 		if (!found)
 			foreach (f; packageInfoFiles)
 				if (existsFile(dub.rootPath ~ f.filename)) {
