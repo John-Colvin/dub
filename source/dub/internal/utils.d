@@ -572,16 +572,15 @@ SourceFileType sourceFileType(string filePath, bool dppSupport) {
 	if (filePath.length >= 3) {
 		if (filePath[$ - 2 .. $] == ".d")
 			return SourceFileType.d;
-		else if (dppSupport &&
-				filePath.length >= 5 &&
-				filePath[$ - 5 .. $] == ".dpp")
+		if (dppSupport
+				&& filePath.length >= 5
+				&& filePath[$ - 5 .. $] == ".dpp")
 			return SourceFileType.dpp;
 	}
 	return SourceFileType.invalid;
 }
 
-string stripSourceSuffix(string filePath, bool dppSupport)
-{
+string stripSourceSuffix(string filePath, bool dppSupport) {
 	final switch (filePath.sourceFileType(dppSupport)) with (SourceFileType) {
 		case d:
 			return filePath[0 .. $ - 2];
