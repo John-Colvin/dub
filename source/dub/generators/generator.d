@@ -261,9 +261,6 @@ class ProjectGenerator
 				if (!hasOutput[depname]) {
 					// add itself
 					ti.packages ~= deppack;
-					// and it's transitive dependencies to current target
-					collectDependencies(deppack, ti, targets, level + 1);
-					continue;
 				}
 				auto depti = &targets[depname];
 				const depbs = &depti.buildSettings;
